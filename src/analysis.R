@@ -13,13 +13,12 @@ data_path <- "../data"
 #### SCRIPT ####
 
 # data import 
- 
-students <- data_frame(course = list.files(path = data_path, pattern = "*.csv")) %>%
+raw <- data_frame(course = list.files(path = data_path, pattern = "*.csv")) %>%
   mutate(contents = map(
     course, 
     ~ read_csv(file.path(data_path, .), col_types = cols(
       `Class Year` = col_character(), 
-      `WesPO` = col_character()),
+      WesPO = col_character()),
       )
     )) %>%
   unnest() %>%
@@ -29,13 +28,14 @@ students <- data_frame(course = list.files(path = data_path, pattern = "*.csv"))
   )
 
 # stats
-
-xtabs(~ course + semester, data = students)
-xtabs(~ course + Grade, data = students)
+table(raw$course)
+table(raw$semester)
+xtabs(~ course + semester, data = raw)
+xtabs(~ course + Grade, data = raw)
+length(unique(raw$WesID))
 
 # potential TAs
-
-data %>%
+raw %>%
   filter(`Class Year` %in% c(2018, 2019, 2020) & Grade %in% c("A+", "A", "A-", "B+")) %>%
   select(`E-mail`) %>%
   write_csv("../data/ta-emails.csv")
