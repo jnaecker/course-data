@@ -64,82 +64,36 @@ enrollments %>%
   write_csv("../data/ta-emails.csv")
 
 # import pdf data
-questions <- c(
-  "Rate your level of effort in this course:",
-  "What is your expected grade in this course\\?",
-  "The Course",
-  "The Teaching",
-  "I knew what was expected of me in this course\\.",
-  "The assignments were a useful part of the course\\.",
-  "There was a clear connection between instruction and assessment\\.",
-  "Instructor conveyed enthusiasm for the subject\\.",
-  "Instructor communicated knowledge effectively\\.",
-  "Instructor treated students with respect\\.",
-  "Instructor was accessible outside of class\\.",
-  "My understanding/ skills grew as a result of this course\\.",
-  "Please comment on the strengths and weaknesses of the course\\.",
-  "Please comment on the strengths and weaknesses of the teaching\\.",
-  "comment on anything else not yet addressed\\.",
-  "What percentage of class sessions did you attend/view\\?",
-  "On average, how many hours per week did you spend on coursework outside of class\\?",
-  "The instructor added value to the course beyond what I could get from simply doing the readings",
-  "This course changed the way that I think about the world",
-  "My knowledge and understanding of the subject matter have increased as a result of this course",
-  "The instructor was successful at facilitating interaction in the classroom",
-  "The assignments reinforced my understanding of the course material",
-  "Instructor was readily available to answer questions outside of class",
-  "Comment on one important thing you learned during this course",
-  "Do you have any advice to pass on to students who take this course in the future?"
-)
-
-stoppers <- c(
-  "What is your expected grade in this course\\?",
-  "Please rate the overall quality of:",
-  "The Teaching",
-  "Please rate the course and the instructor on the following criteria:",
-  "The assignments were a useful part of the course\\.",
-  "There was a clear connection between instruction and assessment\\.",
-  "Instructor conveyed enthusiasm for the subject\\.",
-  "Instructor communicated knowledge effectively\\.",
-  "Instructor treated students with respect\\.",
-  "Instructor was accessible outside of class\\.",
-  "My understanding/ skills grew as a result of this course\\.",
-  "Please comment on the strengths and weaknesses of the course\\.",
-  "Please comment on the strengths and weaknesses of the teaching\\.",
-  "Do you have any other comments\\?",
-  "What percentage of class sessions did you attend/view\\?",
-  "On average, how many hours per week did you spend on coursework outside of class\\?",
-  "The instructor added value to the course beyond what I could get from simply doing the readings",
-  "This course changed the way that I think about the world",
-  "My knowledge and understanding of the subject matter have increased as a result of this course",
-  "The instructor was successful at facilitating interaction in the classroom",
-  "The assignments reinforced my understanding of the course material",
-  "Instructor was readily available to answer questions outside of class",
-  "Comment on one important thing you learned during this course",
-  "Do you have any advice to pass on to students who take this course in the future?",
-  "Copyright Wesleyan University"
-)
-
-df <- data.frame(questions, stoppers, answers = NA)
-
 document <- pdf_text(file.path(evaluations_data_path, "Spring 2017 Teaching Evaluation Response Sheet Report for Naecker  Jeffrey (ECON 211) - Faculty View _58f8ed64-b20f-4ae6-ad47-0e2d171ab2b6en-US.pdf"))
 
-response <- 
-  str_c(document[[2]], document[[3]]) %>%
-  str_replace_all("\n", "") %>%
-  str_replace_all("[0-9]{1,2}\\.", "") %>%
-  str_replace_all("Naecker, Jeffrey", "") %>%
-  str_replace_all("\\(ECON [0-9]{3}\\)", "") %>%
-  str_replace_all("[0-9]{1,2}/[0-9]{1,2}", "")
-
-for (q in c(1:dim(df)[1])){
-  df$answers[q] <- gsub(paste("(^.*)(", df$questions[q], ")(.*)(", df$stoppers[q], ")(.*$)", sep = ""), "\\3", response)
+n <- (length(document) - 1)/2
+out <- list()
+for (i in c(1:n)) {
+  response <- 
+    str_c(document[[i + 1]], document[[i + 2]]) %>%
+    str_replace_all("Naecker, Jeffrey", "") %>%
+    str_replace_all("\\(ECON [0-9]{3}\\)", "") %>%
+    str_replace_all("[0-9]{1,2}/[0-9]{1,2}", "") 
+  
+  questions <- response %>%
+    str_extract_all("(\\W{6,8}[0-9]+\\..*)|(\\W{16,16}.*\n\\W{18,})") %>%
+    unlist() %>%
+    str_replace_all("[0-9]{1,2}\\. ", "") %>%
+    str_trim()
+  
+  answers <- response %>%
+    str_split("(\\W{6,8}[0-9]+\\..*)|(\\W{16,16}.*\n\\W{18,})") %>%
+    unlist() %>%
+    str_replace_all("Copyright Wesleyan University", "") %>%
+    str_trim()
+  
+  out[[i]] <- data.frame(
+    id = i,
+    questions = questions,
+    answers = unlist(answers)[-1]
+  )
 }
 
-df$answers <- df$answers %>%
-  str_replace_all(",$", "") %>%
-  str_replace_all("Copyright Wesleyan University", "") %>%
-  str_replace_all("\\?", "") %>%
-  str_trim() 
-    
+responses <- do.call("rbind", out)
 
+responses$answers <- gsub("([0-9])-\\w.*$", "\\1", responses$answers)
