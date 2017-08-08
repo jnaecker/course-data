@@ -5,6 +5,8 @@ library(readr)
 library(tidyr)
 library(stringr)
 library(pdftools)
+library(reshape2)
+library(ggplot2)
 
 
 
@@ -70,21 +72,21 @@ n <- (length(document) - 1)/2
 out <- list()
 for (i in c(1:n)) {
   response <- 
-    str_c(document[[i + 1]], document[[i + 2]]) %>%
-    str_replace_all("Naecker, Jeffrey", "") %>%
-    str_replace_all("\\(ECON [0-9]{3}\\)", "") %>%
-    str_replace_all("[0-9]{1,2}/[0-9]{1,2}", "") 
+    str_c(document[[2*i]], document[[2*i + 1]]) %>%
+    str_replace_all("\nCopyright Wesleyan University\\W*[0-9]{1,2}/[0-9]{1,2}\n Naecker, Jeffrey \\(ECON [0-9]{3}\\)", "") # clean up page break
   
   questions <- response %>%
-    str_extract_all("(\\W{6,8}[0-9]+\\..*)|(\\W{16,16}.*\n\\W{18,})") %>%
+    str_extract_all("(\\W{6,8}[0-9]{1,2}\\..*)|(\\W{16,16}.*\n\\W{18,})") %>%
     unlist() %>%
-    str_replace_all("[0-9]{1,2}\\. ", "") %>%
+    str_replace_all("[0-9]{1,2}\\. ", "") %>% # remove qestion numbers
+    str_replace_all("^(\"|\\.|!|\\])", "") %>% # remove misc punctuation at beginning of line
+    str_replace_all("\\[$", "") %>%           # remove misc punctuation at end of line
     str_trim()
   
   answers <- response %>%
-    str_split("(\\W{6,8}[0-9]+\\..*)|(\\W{16,16}.*\n\\W{18,})") %>%
+    str_split("(\\W{6,8}[0-9]{1,2}\\..*)|(\\W{16,16}.*\n\\W{18,})") %>%
     unlist() %>%
-    str_replace_all("Copyright Wesleyan University", "") %>%
+    str_replace_all("Copyright Wesleyan University\\W*[0-9]{1,2}/[0-9]{1,2}", "") %>% # clean up page break
     str_trim()
   
   out[[i]] <- data.frame(
@@ -94,6 +96,29 @@ for (i in c(1:n)) {
   )
 }
 
-responses <- do.call("rbind", out)
+responses <- do.call("rbind", out) %>%
+  subset(answers != "")
 
 responses$answers <- gsub("([0-9])-\\w.*$", "\\1", responses$answers)
+
+
+responses_long <- 
+  responses %>% 
+  dcast(id ~ questions, value.var = "answers") 
+
+varlist <- c("I knew what was expected of me in this course.","Instructor communicated knowledge effectively.","Instructor conveyed enthusiasm for the subject.","Instructor treated students with respect.","Instructor was accessible outside of class.","Instructor was readily available to answer questions outside of class","My knowledge and understanding of the subject matter have increased as a result of this course","My understanding/ skills grew as a result of this course.","Rate your level of effort in this course:","The assignments reinforced my understanding of the course material","The assignments were a useful part of the course.","The Course","The instructor added value to the course beyond what I could get from simply doing the readings","The instructor was successful at facilitating interaction in the classroom","The Teaching","There was a clear connection between instruction and assessment.","This course changed the way that I think about the world", "On average, how many hours per week did you spend on coursework outside of class?")
+for (var in varlist) {
+  responses_long[, var] <- as.numeric(responses_long[, var])
+}
+
+responses_long$`What is your expected grade in this course?` <- factor(responses_long$`What is your expected grade in this course?`, levels = c("A+ or A", "A- or B+", "B or B-"))
+
+
+ggplot(aes(x=`The Course`, y=`The Teaching`), data = responses_long) + geom_jitter(width=.1, height=.1) + stat_smooth(method = "lm")
+
+ggplot(aes(x=`The Course`, y=`On average, how many hours per week did you spend on coursework outside of class?`), data = responses_long) + geom_jitter(width=.1, height=.1) + stat_smooth(method = "loess")
+
+ggplot(aes(y=`What is your expected grade in this course?`, x=`On average, how many hours per week did you spend on coursework outside of class?`), 
+       data = subset(responses_long, !is.na(`On average, how many hours per week did you spend on coursework outside of class?`))) +
+  geom_jitter(width=.1, height=.1)
+
