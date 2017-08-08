@@ -8,15 +8,15 @@ library(stringr)
 
 #### CONSTANTS ####
 
-data_path <- "../data"
+enrollment_data_path <- "../data/enrollment"
 
 #### SCRIPT ####
 
 # data import 
-raw <- data_frame(course = list.files(path = data_path, pattern = "*.csv")) %>%
+enrollments <- data_frame(course = list.files(path = enrollment_data_path, pattern = "*.csv")) %>%
   mutate(contents = map(
     course, 
-    ~ read_csv(file.path(data_path, .), col_types = cols(
+    ~ read_csv(file.path(enrollment_data_path, .), col_types = cols(
       `Class Year` = col_character(), 
       WesPO = col_character()),
       )
@@ -27,15 +27,35 @@ raw <- data_frame(course = list.files(path = data_path, pattern = "*.csv")) %>%
     course = str_extract(course, "ECON[0-9]{3}")
   )
 
+# creating other data sets
+students <- enrollments %>%
+  group_by(WesID, Name, `Class Year`, `E-mail`) %>%
+  summarize(
+    enrollment_count = n()
+  )
+
+courses <- enrollments %>%
+  group_by(course) %>%
+  summarize(
+    enrollment_count = n()
+  )
+
+semesters <- enrollments %>%
+  group_by(semester) %>%
+  summarize(
+    enrollment_count = n()
+  )
+  
+
 # stats
-table(raw$course)
-table(raw$semester)
-xtabs(~ course + semester, data = raw)
-xtabs(~ course + Grade, data = raw)
-length(unique(raw$WesID))
+courses
+semesters
+xtabs(~ course + semester, data = enrollments)
+xtabs(~ course + Grade, data = enrollments)
+length(unique(enrollments$WesID))
 
 # potential TAs
-raw %>%
+enrollments %>%
   filter(`Class Year` %in% c(2018, 2019, 2020) & Grade %in% c("A+", "A", "A-", "B+")) %>%
   select(`E-mail`) %>%
   write_csv("../data/ta-emails.csv")
