@@ -69,12 +69,21 @@ enrollments %>%
 instructor_first_name <- "Jeffrey"
 instructor_last_name <- "Naecker"
 
-evaluations <- data_frame(course = list.files(path = evaluations_data_path, pattern = ".*Response Sheet.*.pdf")) %>%
-  mutate(contents = map(
-    course, 
-    ~ pdf_text(file.path(evaluations_data_path, .))
-  )
-)
+extract_responses <- function(document_name) {
+  pdf_text(file.path(evaluations_data_path, document_name)) %>%
+    paste(., collapse = "") %>% 
+    str_split("Course Evaluation Form( \\(continued\\))\n", ) %>%
+    unlist()
+}
+
+evaluations <- data_frame(
+  document_name = list.files(path = evaluations_data_path, pattern = ".*Response Sheet.*.pdf")) %>%
+  mutate(
+    responses = map(document_name, ~ extract_responses(.))  
+  ) %>% 
+  unnest()
+
+
 
 course <- paste(evaluations$contents[[1]], collapse = "") %>% # paste together into one string
   str_split("Course Evaluation Form( \\(continued\\))\n")
