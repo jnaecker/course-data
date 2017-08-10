@@ -69,6 +69,33 @@ enrollments %>%
 instructor_first_name <- "Jeffrey"
 instructor_last_name <- "Naecker"
 
+extract_response_data <- function(response_text){
+  response <- response_text %>% 
+    str_replace_all("\nCopyright Wesleyan University\\W*[0-9]{1,2}/[0-9]{1,2}\n", "") %>% # remove headers
+    str_replace_all(paste(instructor_last_name, instructor_first_name, "\\([A-Z]{4,4} [0-9]{3}\\)\n"), "") # remove footers
+  
+  questions <- response %>%
+    str_extract_all("(\\W{6,8}[0-9]{1,2}\\..*)|(\\W{16,16}.*\n\\W{18,})") %>%
+    unlist() %>%
+    str_replace_all("[0-9]{1,2}\\. ", "") %>% # remove qestion numbers
+    str_replace_all("^(\"|\\.|!|\\])", "") %>% # remove misc punctuation at beginning of line
+    str_replace_all("\\[$", "") %>%           # remove misc punctuation at end of line
+    str_trim()
+  
+  answers <- response %>%
+    str_split("(\\W{6,8}[0-9]{1,2}\\..*)|(\\W{16,16}.*\n\\W{18,})") %>%
+    unlist() %>%
+    str_replace_all("Copyright Wesleyan University\\W*[0-9]{1,2}/[0-9]{1,2}", "") %>% # clean up page break
+    str_trim() %>%
+    gsub("([0-9])-\\w.*$", "\\1", .)
+  
+  data.frame(
+    questions = questions,
+    answers = unlist(answers)[-1]
+  ) %>%
+    subset(answers != "")
+}
+
 extract_responses <- function(document_name) {
   pdf_text(file.path(evaluations_data_path, document_name)) %>%
     paste(., collapse = "") %>% 
@@ -76,42 +103,22 @@ extract_responses <- function(document_name) {
     unlist()
 }
 
-evaluations <- data_frame(
+evaluations <- data.frame(
   document_name = list.files(path = evaluations_data_path, pattern = ".*Response Sheet.*.pdf")) %>%
   mutate(
     responses = map(document_name, ~ extract_responses(.))  
   ) %>% 
-  unnest()
+  unnest() %>%
+  mutate(
+    response_data = map(responses, ~ extract_response_data(.))
+  )
 
 
 
-course <- paste(evaluations$contents[[1]], collapse = "") %>% # paste together into one string
-  str_split("Course Evaluation Form( \\(continued\\))\n")
+
 
 response <- course[[1]][2] %>%
-  str_replace_all("\nCopyright Wesleyan University\\W*[0-9]{1,2}/[0-9]{1,2}\n", "") %>% # remove headers
-  str_replace_all(paste(instructor_last_name, instructor_first_name, "\\([A-Z]{4,4} [0-9]{3}\\)\n"), "") # remove footers
 
-questions <- response %>%
-  str_extract_all("(\\W{6,8}[0-9]{1,2}\\..*)|(\\W{16,16}.*\n\\W{18,})") %>%
-  unlist() %>%
-  str_replace_all("[0-9]{1,2}\\. ", "") %>% # remove qestion numbers
-  str_replace_all("^(\"|\\.|!|\\])", "") %>% # remove misc punctuation at beginning of line
-  str_replace_all("\\[$", "") %>%           # remove misc punctuation at end of line
-  str_trim()
-  
-answers <- response %>%
-  str_split("(\\W{6,8}[0-9]{1,2}\\..*)|(\\W{16,16}.*\n\\W{18,})") %>%
-  unlist() %>%
-  str_replace_all("Copyright Wesleyan University\\W*[0-9]{1,2}/[0-9]{1,2}", "") %>% # clean up page break
-  str_trim() %>%
-  gsub("([0-9])-\\w.*$", "\\1", .)
-  
-out <- data.frame(
-  questions = questions,
-  answers = unlist(answers)[-1]
-  ) %>%
-  subset(answers != "")
 
 
 
