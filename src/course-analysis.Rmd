@@ -1,3 +1,5 @@
+## Analysis of My Course Data
+
 ```{r setup, echo=F, message=F, warning=F}
 knitr::opts_chunk$set(echo = F, message = F, warning = F)
 
@@ -11,6 +13,7 @@ library(stringr)
 library(pdftools)
 library(reshape2)
 library(ggplot2)
+library(tibble)
 
 #### CONSTANTS ####
 
@@ -78,7 +81,10 @@ extract_responses <- function(document_name) {
 #### DATA IMPORT ####
 
 ##### import enrollment data #####
-enrollments <- data_frame(course = list.files(path = enrollment_data_path, pattern = "*.csv")) %>%
+enrollments <- 
+  data_frame(
+    course = list.files(path = enrollment_data_path, pattern = "*.csv")
+  ) %>%
   mutate(contents = map(
     course, 
     ~ read_csv(file.path(enrollment_data_path, .), col_types = cols(
@@ -88,118 +94,180 @@ enrollments <- data_frame(course = list.files(path = enrollment_data_path, patte
     )) %>%
   unnest() %>%
   mutate(
-    semester = str_extract(course, "[0-9]{4}"),
-    course = str_extract(course, "ECON[0-9]{3}")
-  )
+    department = str_extract(course, "[A-Z]{3,4}"),
+    semester_code = str_extract(course, "[0-9]{4}"),
+    course = str_extract(course, "[0-9]{3}"),
+    year = 2000 + (as.numeric(semester_code) %% 1000) %/% 10,
+    semester = ifelse(as.numeric(semester_code)  %% 10 == 9, "Fall", "Spring"),
+    semester_year = as.numeric(year) + ifelse(semester == "Fall", 0.5, 0),
+    GPA = case_when(
+      .$Grade == "A+" ~ 4.3,
+      .$Grade == "A"  ~ 4.0,
+      .$Grade == "A-" ~ 3.7,
+      .$Grade == "B+" ~ 3.5,
+      .$Grade == "B"  ~ 3.0,
+      .$Grade == "B-" ~ 2.7,
+      .$Grade == "C+" ~ 2.3,
+      .$Grade == "C"  ~ 2.0,
+      .$Grade == "C-" ~ 1.7,
+      TRUE            ~ NaN)
+  ) %>%
+  select(semester, year, semester_code, semester_year, department, course, Name, WesID, `E-mail`, Credit, `Class Year`, Grade, GPA, Majors, `Prereq Met`)
 
-###### create other enrollment-based data sets #####
-students <- enrollments %>%
-  group_by(WesID, Name, `Class Year`, `E-mail`) %>%
-  summarize(
-    enrollment_count = n()
-  )
+## make enrollment variables have right class
+varnames <- names(enrollments)
+for (i in c(1:length(varnames))){
+  if (str_detect(varnames[i], "Name|E-mail|WesID")){
+    enrollments[[i]] <- as.character(enrollments[[i]])
+  } else 
+  if (str_detect(varnames[i], "Grade")) {
+    enrollments[[i]] <- factor(enrollments[[i]], levels = c("A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "CR", "W"))
+  } else   
+  if (str_detect(varnames[i], "^semester$")) {
+    enrollments[[i]] <- factor(enrollments[[i]], levels = c("Spring", "Fall"))
+  } else 
+  if (str_detect(varnames[i], "^(GPA|year)$")) {
+    enrollments[[i]] <- as.numeric(enrollments[[i]])
+  } else {
+    enrollments[[i]] <- as.factor(enrollments[[i]])
+  } 
+}
 
-courses <- enrollments %>%
-  group_by(course) %>%
+## agregate to course semester level
+course_semester_enrollments <-
+  enrollments %>% 
+  group_by(semester, year, semester_year, department, course) %>%
   summarize(
-    enrollment_count = n()
-  )
-
-semesters <- enrollments %>%
-  group_by(semester) %>%
-  summarize(
-    enrollment_count = n()
-  )
+    enroll_count = n(),
+    GPA = mean(GPA, na.rm=T)
+  ) %>%
+  arrange(year)
 
 ##### import evaluation data #####
-evaluations <- data_frame(
-  document_name = list.files(path = evaluations_data_path, pattern = ".*Response Sheet.*.pdf")) %>%
+evaluations <- 
+  data_frame(
+    document_name = list.files(path = evaluations_data_path, pattern = ".*Response Sheet.*.pdf")
+  ) %>%
   mutate(
     evaluation_data = map(document_name, ~ extract_evaluation_data(.))
   ) %>% 
-  unnest()
-  
-##### creaate other evaluations-based data sets
-responses <- evaluations %>% 
+  unnest() %>% 
   mutate(
     responses = map(document_name, ~ extract_responses(.))  
-  ) %>% unnest
-
-responses_long <- responses %>%
+  ) %>% 
+  unnest() %>%
   mutate(
     response_data = map(responses, ~ extract_response_data(.))
   ) %>%
-  unnest()
+  unnest() %>% 
+  dcast(semester + year + department + course + response_number ~ questions, value.var = "answers") %>%
+  mutate(semester_year = as.numeric(year) + ifelse(semester == "Fall", 0.5, 0)) %>%
+  as_tibble()
 
-responses_wide <- 
-  responses_long %>% 
-  dcast(semester + year + department + course + response_number ~ questions, value.var = "answers") 
-
-## make variables have right class
-varnames <- names(responses_wide)
+## make evaluation variables have right class
+varnames <- names(evaluations)
 for (i in c(1:length(varnames))){
   if(str_detect(varnames[i], "(C|c)omment|advice")){
-    responses_wide[, i] <- as.character(responses_wide[, i])
+    evaluations[[i]] <- as.character(evaluations[[i]])
   } else 
   if (str_detect(varnames[i], "expected grade")) {
-    responses_wide[, i] <- factor(responses_wide[, i], levels = c("A+ or A", "A- or B+", "B or B-", "C+ or C"))
+    evaluations[[i]] <- factor(evaluations[[i]], levels = c("A+ or A", "A- or B+", "B or B-", "C+ or C"))
   } else
   if (str_detect(varnames[i], "percentage of class sessions")) {
-    responses_wide[, i] <- factor(responses_wide[, i], levels = c("91 - 100", "81 - 90", "71 - 80", "61 - 70", "51 - 60", "41 - 50", "31 - 40", "21 - 30"))
+    evaluations[[i]] <- factor(evaluations[[i]], levels = c("91 - 100", "81 - 90", "71 - 80", "61 - 70", "51 - 60", "41 - 50", "31 - 40", "21 - 30"))
   } else
-  if (str_detect(varnames[i], "^(semester|year|department|course)$")) {
-    responses_wide[, i] <- as.factor(responses_wide[, i])
-  } else 
-    responses_wide[, i] <- as.numeric(responses_wide[, i])
+  if (str_detect(varnames[i], "^semester$")) {
+    evaluations[[i]] <- factor(evaluations[[i]], levels = c("Spring", "Fall"))
+  } else
+  if (str_detect(varnames[i], "^(department|course)$")) {
+    evaluations[[i]] <- as.factor(evaluations[[i]])
+  } else {
+    evaluations[[i]] <- as.numeric(evaluations[[i]])
+  }
 }
+
+##### aggregate to course-semester level
+course_semester_evaluations <-
+  evaluations %>% 
+  group_by(semester, year, semester_year, department, course) %>%
+  summarize(
+    eval_count = n(),
+    course_rating = mean(`The Course`, na.rm=T),
+    teaching_rating = mean(`The Teaching`, na.rm=T)
+  ) %>%
+  arrange(year)
+
+course_semesters <-
+  course_semester_evaluations %>%
+  merge(course_semester_enrollments, by = c("semester", "year", "semester_year", "department", "course"), all = T) %>%
+  as_tibble() %>%
+  arrange(year)
+```
+
+Let's start by looking at my performance over time in the two key metrics:
+
+```{r key-metrics}
+ggplot(evaluations, aes(x = as.factor(semester_year), y = `The Teaching`)) + 
+  geom_jitter(width = 0, alpha = 0.2) +
+  stat_summary(color = "red")
+
+ggplot(evaluations, aes(x = as.factor(semester_year), y = `The Course`)) + 
+  geom_jitter(width = 0, alpha = 0.2) +
+  stat_summary(color = "red")
+```
+
+These two variables are highly correlated:
+
+```{r}
+ggplot(aes(x=`The Course`, y=`The Teaching`), data = evaluations) + 
+  geom_jitter(width=.1, height=.1) + 
+  stat_smooth(method = "lm")
+```
+
+Interestingly, there is not much correlation between the course rating and the reported effort.
+
+```{r}
+ggplot(aes(x=`The Course`, y=`On average, how many hours per week did you spend on coursework outside of class?`), data = evaluations) + 
+  geom_jitter(width=.1, height=.1) + 
+  stat_smooth(method = "loess")
+```
+
+There is also not much corelation between reported effort and expected grade.
+
+```{r}
+ggplot(aes(y=`What is your expected grade in this course?`, x=`On average, how many hours per week did you spend on coursework outside of class?`),
+       data = subset(evaluations, !is.na(`On average, how many hours per week did you spend on coursework outside of class?`))) +
+  geom_jitter(width=.1, height=.1) 
+```
+
+Let's see what the distribution of grades I give is:
+
+```{r}
+xtabs(~ course + Grade, data = subset(enrollments, course %in% c("301", "211", "311")), drop.unused.levels = T)
+```
+
+Is there any pattern to the average grades in my classes?
+
+```{r}
+ggplot(subset(enrollments, course %in% c("301", "211", "311")), aes(x=semester_year, y=GPA)) + 
+  stat_summary() +
+  facet_wrap(~course)
 ```
 
 
+What is my number of unique students taught?
 
-```{r analysis}
-#### ANALYSIS ####
-
-# enrollment stats
-courses
-semesters
-xtabs(~ course + semester, data = enrollments)
-xtabs(~ course + Grade, data = enrollments)
+```{r}
 length(unique(enrollments$WesID))
 
-# plots
-ggplot(aes(x=`The Course`, y=`The Teaching`), data = responses_wide) + geom_jitter(width=.1, height=.1) + stat_smooth(method = "lm")
+```
 
-ggplot(aes(x=`The Course`, y=`On average, how many hours per week did you spend on coursework outside of class?`), data = responses_wide) + geom_jitter(width=.1, height=.1) + stat_smooth(method = "loess")
 
-ggplot(aes(y=`What is your expected grade in this course?`, x=`On average, how many hours per week did you spend on coursework outside of class?`),
-       data = subset(responses_wide, !is.na(`On average, how many hours per week did you spend on coursework outside of class?`))) +
-  geom_jitter(width=.1, height=.1)
-
-# responses_wide %>%
-# select(which(sapply(., is.numeric))) %>%
-#   pairs()
-
-ggplot(aes(x = `The Teaching`), data = responses_wide) +
-  facet_grid(semester + year ~ course) +
-  geom_histogram()
-
-ggplot(aes(x = `The Course`), data = responses_wide) +
-  facet_grid(semester + year ~ course) +
-  geom_histogram()
-
-ggplot(aes(x = `What percentage of class sessions did you attend/view?`), data = responses_wide) +
-  facet_grid(semester + year ~ course) +
-  geom_bar()
-
-ggplot(aes(x = responses_wide$`On average, how many hours per week did you spend on coursework outside of class?`), data = responses_wide) +
-  facet_grid(semester + year ~ course) +
-  geom_bar()
-
+```{r}
 # potential TAs
-enrollments %>%
-  filter(`Class Year` %in% c(2018, 2019, 2020) & Grade %in% c("A+", "A", "A-", "B+")) %>%
-  select(`E-mail`)
-
+# enrollments %>%
+#   filter(`Class Year` %in% c(2018, 2019, 2020) & Grade %in% c("A+", "A", "A-", "B+")) %>%
+#   select(`E-mail`)
 ```
 
 
