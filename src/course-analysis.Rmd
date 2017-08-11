@@ -1,3 +1,7 @@
+```{r setup, echo=F, message=F, warning=F}
+knitr::opts_chunk$set(echo = F, message = F, warning = F)
+
+
 #### LIBRARIES ####
 library(dplyr)
 library(purrr)
@@ -148,46 +152,58 @@ for (i in c(1:length(varnames))){
   } else 
     responses_wide[, i] <- as.numeric(responses_wide[, i])
 }
+```
 
 
 
-
+```{r analysis}
 #### ANALYSIS ####
 
 # enrollment stats
-# courses
-# semesters
-# xtabs(~ course + semester, data = enrollments)
-# xtabs(~ course + Grade, data = enrollments)
-# length(unique(enrollments$WesID))
+courses
+semesters
+xtabs(~ course + semester, data = enrollments)
+xtabs(~ course + Grade, data = enrollments)
+length(unique(enrollments$WesID))
 
 # plots
-# ggplot(aes(x=`The Course`, y=`The Teaching`), data = responses_wide) + geom_jitter(width=.1, height=.1) + stat_smooth(method = "lm")
-# 
-# ggplot(aes(x=`The Course`, y=`On average, how many hours per week did you spend on coursework outside of class?`), data = responses_wide) + geom_jitter(width=.1, height=.1) + stat_smooth(method = "loess")
-# 
-# ggplot(aes(y=`What is your expected grade in this course?`, x=`On average, how many hours per week did you spend on coursework outside of class?`), 
-#        data = subset(responses_wide, !is.na(`On average, how many hours per week did you spend on coursework outside of class?`))) +
-#   geom_jitter(width=.1, height=.1)
-#   
-#   responses_wide %>%
+ggplot(aes(x=`The Course`, y=`The Teaching`), data = responses_wide) + geom_jitter(width=.1, height=.1) + stat_smooth(method = "lm")
+
+ggplot(aes(x=`The Course`, y=`On average, how many hours per week did you spend on coursework outside of class?`), data = responses_wide) + geom_jitter(width=.1, height=.1) + stat_smooth(method = "loess")
+
+ggplot(aes(y=`What is your expected grade in this course?`, x=`On average, how many hours per week did you spend on coursework outside of class?`),
+       data = subset(responses_wide, !is.na(`On average, how many hours per week did you spend on coursework outside of class?`))) +
+  geom_jitter(width=.1, height=.1)
+
+# responses_wide %>%
 # select(which(sapply(., is.numeric))) %>%
 #   pairs()
-#   
-#   ggplot(aes(x = `The Teaching`), data = responses_wide) + 
-# facet_grid(semester + year ~ course) +
-#   geom_histogram()
-# 
-# ggplot(aes(x = `The Course`), data = responses_wide) + 
-#   facet_grid(semester + year ~ course) +
-#   geom_histogram()
-# 
-# ggplot(aes(x = `What percentage of class sessions did you attend/view?`), data = responses_wide) + 
-#   facet_grid(semester + year ~ course) +
-#   geom_bar()
+
+ggplot(aes(x = `The Teaching`), data = responses_wide) +
+  facet_grid(semester + year ~ course) +
+  geom_histogram()
+
+ggplot(aes(x = `The Course`), data = responses_wide) +
+  facet_grid(semester + year ~ course) +
+  geom_histogram()
+
+ggplot(aes(x = `What percentage of class sessions did you attend/view?`), data = responses_wide) +
+  facet_grid(semester + year ~ course) +
+  geom_bar()
+
+ggplot(aes(x = responses_wide$`On average, how many hours per week did you spend on coursework outside of class?`), data = responses_wide) +
+  facet_grid(semester + year ~ course) +
+  geom_bar()
 
 # potential TAs
-# enrollments %>%
-#   filter(`Class Year` %in% c(2018, 2019, 2020) & Grade %in% c("A+", "A", "A-", "B+")) %>%
-#   select(`E-mail`) %>%
-#   write_csv("../data/ta-emails.csv")
+enrollments %>%
+  filter(`Class Year` %in% c(2018, 2019, 2020) & Grade %in% c("A+", "A", "A-", "B+")) %>%
+  select(`E-mail`)
+
+```
+
+
+
+
+
+

@@ -2,3 +2,4 @@ data/*
 misc/*
 **/.DS_Store
 **/.Rhistory
+src/*.html
