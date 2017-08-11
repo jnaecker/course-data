@@ -8,67 +8,15 @@ library(pdftools)
 library(reshape2)
 library(ggplot2)
 
-
-
 #### CONSTANTS ####
 
 enrollment_data_path <- "../data/enrollment"
 evaluations_data_path <- "../data/evaluations"
-
-#### SCRIPT ####
-
-# import enrollment data
-enrollments <- data_frame(course = list.files(path = enrollment_data_path, pattern = "*.csv")) %>%
-  mutate(contents = map(
-    course, 
-    ~ read_csv(file.path(enrollment_data_path, .), col_types = cols(
-      `Class Year` = col_character(), 
-      WesPO = col_character()),
-      )
-    )) %>%
-  unnest() %>%
-  mutate(
-    semester = str_extract(course, "[0-9]{4}"),
-    course = str_extract(course, "ECON[0-9]{3}")
-  )
-
-# creating other data sets
-students <- enrollments %>%
-  group_by(WesID, Name, `Class Year`, `E-mail`) %>%
-  summarize(
-    enrollment_count = n()
-  )
-
-courses <- enrollments %>%
-  group_by(course) %>%
-  summarize(
-    enrollment_count = n()
-  )
-
-semesters <- enrollments %>%
-  group_by(semester) %>%
-  summarize(
-    enrollment_count = n()
-  )
-  
-
-# enrollment stats
-courses
-semesters
-xtabs(~ course + semester, data = enrollments)
-xtabs(~ course + Grade, data = enrollments)
-length(unique(enrollments$WesID))
-
-# potential TAs
-enrollments %>%
-  filter(`Class Year` %in% c(2018, 2019, 2020) & Grade %in% c("A+", "A", "A-", "B+")) %>%
-  select(`E-mail`) %>%
-  write_csv("../data/ta-emails.csv")
-
-# import pdf data
 instructor_first_name <- "Jeffrey"
 instructor_last_name <- "Naecker"
 master_string <- "(\\W{6,8}[0-9]{1,2}\\..*)|(\\W{16,16}.*\n\\W{20,})"
+
+#### FUNCTIONS ####
 
 extract_response_data <- function(response_text){
   response <- response_text %>% 
@@ -89,6 +37,7 @@ extract_response_data <- function(response_text){
     unlist() %>%
     str_replace_all("Copyright Wesleyan University\\W*[0-9]{1,2}/[0-9]{1,2}", "") %>% # clean up page break
     str_replace_all("\n", "") %>% #remove line breaks
+    str_replace_all("comment on anything else not yet addressed\\.", "") %>% #random fix
     str_trim() %>%
     gsub("([0-9])-\\w.*$", "\\1", .) # remove text from numerical responses
   
@@ -108,7 +57,7 @@ extract_evaluation_data <- function(document_name) {
     course = str_match(text, "([A-Z]{3,4}) ([0-9]{3,3})")[,3],
     audience = str_match(text, "(Project Audience) ([0-9]+)")[,3],
     responses_received = str_match(text, "(Responses Received) ([0-9]+)")[,3]
-    )
+  )
 }
 
 extract_responses <- function(document_name) {
@@ -122,6 +71,43 @@ extract_responses <- function(document_name) {
   )
 }
 
+#### DATA IMPORT ####
+
+##### import enrollment data #####
+enrollments <- data_frame(course = list.files(path = enrollment_data_path, pattern = "*.csv")) %>%
+  mutate(contents = map(
+    course, 
+    ~ read_csv(file.path(enrollment_data_path, .), col_types = cols(
+      `Class Year` = col_character(), 
+      WesPO = col_character()),
+      )
+    )) %>%
+  unnest() %>%
+  mutate(
+    semester = str_extract(course, "[0-9]{4}"),
+    course = str_extract(course, "ECON[0-9]{3}")
+  )
+
+###### create other enrollment-based data sets #####
+students <- enrollments %>%
+  group_by(WesID, Name, `Class Year`, `E-mail`) %>%
+  summarize(
+    enrollment_count = n()
+  )
+
+courses <- enrollments %>%
+  group_by(course) %>%
+  summarize(
+    enrollment_count = n()
+  )
+
+semesters <- enrollments %>%
+  group_by(semester) %>%
+  summarize(
+    enrollment_count = n()
+  )
+
+##### import evaluation data #####
 evaluations <- data_frame(
   document_name = list.files(path = evaluations_data_path, pattern = ".*Response Sheet.*.pdf")) %>%
   mutate(
@@ -129,7 +115,7 @@ evaluations <- data_frame(
   ) %>% 
   unnest()
   
-
+##### creaate other evaluations-based data sets
 responses <- evaluations %>% 
   mutate(
     responses = map(document_name, ~ extract_responses(.))  
@@ -146,16 +132,62 @@ responses_wide <-
   dcast(semester + year + department + course + response_number ~ questions, value.var = "answers") 
 
 ## make variables have right class
+varnames <- names(responses_wide)
+for (i in c(1:length(varnames))){
+  if(str_detect(varnames[i], "(C|c)omment|advice")){
+    responses_wide[, i] <- as.character(responses_wide[, i])
+  } else 
+  if (str_detect(varnames[i], "expected grade")) {
+    responses_wide[, i] <- factor(responses_wide[, i], levels = c("A+ or A", "A- or B+", "B or B-", "C+ or C"))
+  } else
+  if (str_detect(varnames[i], "percentage of class sessions")) {
+    responses_wide[, i] <- factor(responses_wide[, i], levels = c("91 - 100", "81 - 90", "71 - 80", "61 - 70", "51 - 60", "41 - 50", "31 - 40", "21 - 30"))
+  } else
+  if (str_detect(varnames[i], "^(semester|year|department|course)$")) {
+    responses_wide[, i] <- as.factor(responses_wide[, i])
+  } else 
+    responses_wide[, i] <- as.numeric(responses_wide[, i])
+}
 
 
 
-#### PLOTS ####
 
-ggplot(aes(x=`The Course`, y=`The Teaching`), data = responses_long) + geom_jitter(width=.1, height=.1) + stat_smooth(method = "lm")
+#### ANALYSIS ####
 
-ggplot(aes(x=`The Course`, y=`On average, how many hours per week did you spend on coursework outside of class?`), data = responses_long) + geom_jitter(width=.1, height=.1) + stat_smooth(method = "loess")
+# enrollment stats
+# courses
+# semesters
+# xtabs(~ course + semester, data = enrollments)
+# xtabs(~ course + Grade, data = enrollments)
+# length(unique(enrollments$WesID))
 
-ggplot(aes(y=`What is your expected grade in this course?`, x=`On average, how many hours per week did you spend on coursework outside of class?`), 
-       data = subset(responses_long, !is.na(`On average, how many hours per week did you spend on coursework outside of class?`))) +
-  geom_jitter(width=.1, height=.1)
+# plots
+# ggplot(aes(x=`The Course`, y=`The Teaching`), data = responses_wide) + geom_jitter(width=.1, height=.1) + stat_smooth(method = "lm")
+# 
+# ggplot(aes(x=`The Course`, y=`On average, how many hours per week did you spend on coursework outside of class?`), data = responses_wide) + geom_jitter(width=.1, height=.1) + stat_smooth(method = "loess")
+# 
+# ggplot(aes(y=`What is your expected grade in this course?`, x=`On average, how many hours per week did you spend on coursework outside of class?`), 
+#        data = subset(responses_wide, !is.na(`On average, how many hours per week did you spend on coursework outside of class?`))) +
+#   geom_jitter(width=.1, height=.1)
+#   
+#   responses_wide %>%
+# select(which(sapply(., is.numeric))) %>%
+#   pairs()
+#   
+#   ggplot(aes(x = `The Teaching`), data = responses_wide) + 
+# facet_grid(semester + year ~ course) +
+#   geom_histogram()
+# 
+# ggplot(aes(x = `The Course`), data = responses_wide) + 
+#   facet_grid(semester + year ~ course) +
+#   geom_histogram()
+# 
+# ggplot(aes(x = `What percentage of class sessions did you attend/view?`), data = responses_wide) + 
+#   facet_grid(semester + year ~ course) +
+#   geom_bar()
 
+# potential TAs
+# enrollments %>%
+#   filter(`Class Year` %in% c(2018, 2019, 2020) & Grade %in% c("A+", "A", "A-", "B+")) %>%
+#   select(`E-mail`) %>%
+#   write_csv("../data/ta-emails.csv")
