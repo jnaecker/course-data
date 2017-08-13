@@ -22,6 +22,7 @@ evaluations_data_path <- "../data/evaluations"
 instructor_first_name <- "Jeffrey"
 instructor_last_name <- "Naecker"
 master_string <- "(\\W{6,8}[0-9]{1,2}\\..*)|(\\W{16,16}.*\n\\W{20,})"
+theme_set(theme_minimal())
 
 #### FUNCTIONS ####
 
@@ -232,12 +233,12 @@ ggplot(aes(x=`The Course`, y=`On average, how many hours per week did you spend 
   stat_smooth(method = "loess")
 ```
 
-There is also not much corelation between reported effort and expected grade.
+It appears that students with lower expected grades work harder in my courses:
 
 ```{r}
-ggplot(aes(y=`What is your expected grade in this course?`, x=`On average, how many hours per week did you spend on coursework outside of class?`),
+ggplot(aes(x=`What is your expected grade in this course?`, y=`On average, how many hours per week did you spend on coursework outside of class?`),
        data = subset(evaluations, !is.na(`On average, how many hours per week did you spend on coursework outside of class?`))) +
-  geom_jitter(width=.1, height=.1) 
+  stat_boxplot()
 ```
 
 Let's see what the distribution of grades I give is:
