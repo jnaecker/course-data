@@ -14,6 +14,7 @@ library(pdftools)
 library(reshape2)
 library(ggplot2)
 library(tibble)
+library(xtable)
 
 #### CONSTANTS ####
 
@@ -272,7 +273,57 @@ length(unique(enrollments$WesID))
 ```
 
 
+## Course Diaries
 
+### Econ 301
 
+#### Spring 2017
+
+```{r results='asis'}
+responses <- c(
+  "None.",
+  "Good advice! Will pass on to next semester's students.",
+  "Will try to make in-class problems closer to problem sets.",
+  "Will look for more direct applications, but I think level of theory and use of muti-variate calculus in my class is appropriate when compared to other instructors. Will try to make in-class problems closer to problem sets.",
+  "Will try to add more numerical examples, though one of the main learning goals for this course is working with variables and abstract quantities.",
+  "None.",
+  "None.",
+  "Agree that exams were a little too long/hard, especially second midterm. I was clear, however, that I do not expect median student to finish exam.",
+  "Disagree with the characterization that slides were 'full of typos'. Probably found a small typo in slides about once per week, which I corrected in class and posted corrected slides online.",
+  "Agree that I took far to long to return firs midterm (though 6 week number includes spring break, when I was traveling). Exams and problem sets do include some qualitative questions, but I will try to increase this. Re: exam difficulty, see above.",
+  "Exams are intended to have some problems that involve novel combinations of concepts in the class; this is how true understanding is revealed!  Will work to improve connection between lecture time and problem sets. Interesting comment about leaving more derivations to the textbook; I feel that if not covered in lecture, most students would not put in work to understand where these formulas come from.  You **should** be teadching yourself to some extent! Re: giving topics on problem set problems, figuring out what tools to use is part of the learning process!",
+  "Good advice! Will pass on to next semester's students.",
+  "None.",
+  "Good advice! Will pass on to next semester's students.",
+  "None.",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  ""
+)
+
+evaluations %>% 
+  filter(semester == "Spring" & year == 2017 & course == "301") %>%
+  mutate(`Instructor Response` = responses) %>%
+  select(response_number, `The Course`, `The Teaching`, matches("Please comment"), matches("Do you have any"), `Instructor Response`) %>%
+  xtable() %>%
+  print(type = "html")
+```
+
+Overall responses
+
+- Will make exams slightly shorter and easier.
+- Will improve connection between lecture material and assesments.
+- Will return exams within 2 weeks.
 
 
