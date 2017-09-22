@@ -246,6 +246,11 @@ Let's see what the distribution of grades I give is:
 
 ```{r}
 xtabs(~ course + Grade, data = subset(enrollments, course %in% c("301", "211", "311")), drop.unused.levels = T)
+
+enrollments %>% 
+  filter(course %in% c("301", "211", "311")) %>%
+  ggplot(aes(x=Grade)) + geom_bar() + facet_wrap(~course, nrow = 3)
+
 ```
 
 Is there any pattern to the average grades in my classes?
@@ -296,34 +301,43 @@ responses <- c(
   "None.",
   "Good advice! Will pass on to next semester's students.",
   "None.",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  "",
-  ""
+  "I appreciate the suggestion about going over exam and problem set problems after the fact in class.However, I don't think I can justify taking time away from learning new material to do this. Note that I do provide detailed solutions for all problem sets and exams, and am happy to go over these in detail with students in office hours.",
+  "Will consider making exams and problem sets slightly shorter and easier.",
+  "Will try to add more numerical examples.",
+  "Problem sets are *intended* to be harder than examples in lecture.",
+  "None.",
+  "Will make assessments slightly easier/clearer/shorter in future.",
+  "The point of not puting everything on the slides is to force the students to generate their own examples/solutions before seeing mine.",
+  "Appreciate the point about using slides, but I think benefits for most students outweight costs. Re: exam difficulty, I don't follow that a difficult exam is necessarily unfair. All exams include easier components that most students should get, as well as more difficult ones that only top students might get. Will make exams slightly shorter in future, but don't have much slack until top students start getting perfect scores.  Re: office hours, this was listed below TA and Piazza Q&A on my list of places to get help, but this was done to encourage using these group resources, not to discourage coming to my office hours.",
+  "Will post problem sets much earlier next semester.",
+  "This courses is intended to be fairly theoretical (it is called Microeconomic Theory, after all). Elective courses are intended to be more applied.",
+  "See previous comments on difficulty and mathematical rigor.",
+  "See previous comments on numerical vs abstract quantities.",
+  "None.",
+  "None."
 )
 
 evaluations %>% 
   filter(semester == "Spring" & year == 2017 & course == "301") %>%
   mutate(`Instructor Response` = responses) %>%
-  select(response_number, `The Course`, `The Teaching`, matches("Please comment"), matches("Do you have any"), `Instructor Response`) %>%
+  select(`The Course`, `The Teaching`, matches("Please comment"), matches("Do you have any"), `Instructor Response`) %>%
   xtable() %>%
   print(type = "html")
 ```
 
-Overall responses
+Summary thoughts:
+
+- It seems that many students did not understand that problem sets and exams might force them to step a little bit outside their comfort zone, for example by connecting two seemingly disparate parts of class, or by applying tools to setting they have not seen before. 
+- I suspect that many students who were unhappy with difficulty did not take advantage of office hours, Piazza Q&A, TAs, study groups, or math/econ workshops.
+- Students did not fully appreciate that course is intented to be somewhat theoretical and abstract. I think my course is within the normal range of mathematical rigor and theory vs application.
+
+Changes:
 
 - Will make exams slightly shorter and easier.
+- Will make problem sets slightly shorter and easier.
 - Will improve connection between lecture material and assesments.
+- Will consider more numerical examples and problems.
 - Will return exams within 2 weeks.
+- Will post weekly problem sets much earlier, ideally at beginning of semester.
 
 
