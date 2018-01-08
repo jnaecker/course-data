@@ -1,5 +1,7 @@
 data/*
 misc/*
+output/*
 **/.DS_Store
 **/.Rhistory
 src/*.html
+.Rproj.user
